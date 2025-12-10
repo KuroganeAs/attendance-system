@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-script
+data:
+  attendance_system.sql: |
+    -- phpMyAdmin SQL Dump
+    SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+    START TRANSACTION;
+    SET time_zone = "+00:00";
+    
+    CREATE TABLE IF NOT EXISTS `users` (
+      `id` int(100) NOT NULL AUTO_INCREMENT,
+      `profilepic` varchar(100) NOT NULL,
+      `first_name` varchar(100) NOT NULL,
+      `last_name` varchar(100) NOT NULL,
+      `email` varchar(100) NOT NULL,
+      `bio` varchar(100) NOT NULL,
+      PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+    
+    CREATE TABLE IF NOT EXISTS `userss` (
+      `id` int(11) NOT NULL AUTO_INCREMENT,
+      `username` varchar(255) NOT NULL,
+      `email` varchar(255) NOT NULL,
+      `password` varchar(255) NOT NULL,
+      `name` varchar(255) NOT NULL,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `username` (`username`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+    
+    INSERT INTO `users` (`id`, `profilepic`, `first_name`, `last_name`, `email`, `bio`) VALUES
+    (8, 'ecebbecf28c2692aeb021597fbddb174.jpg', 'Lili', 'Susanti', 'lilisusanti@gmail.com', 'Hi!'),
+    (10, '68d5535b971d558f594f10a5affd0a71jpeg', 'Vina', 'Sumarti', 'vinasumarti@gmail.com', 'Hai semua')
+    ON DUPLICATE KEY UPDATE id=id;
+    
+    INSERT INTO `userss` (`id`, `username`, `email`, `password`, `name`) VALUES
+    (4, 'sasa', 'sasarisa@gmail.com', '$2y$10$IFGSL681/rAh68aGNP8wrOl/.nBHQXbqvepo5UFaosS9mlQQu/2pW', 'sasa'),
+    (14, 'rara', 'raranina@gmail.com', '$2y$10$ONIvkhbgXR0XyCb.boreoekBtCEpH/HntG/8vGJk2M76k44W3AdYu', 'rara'),
+    (16, 'nana', 'nanagwen@gmail.com', '$2y$10$5XmKiIsUc6A6KdS8FI7c2Ovs0XPjMndATds/8HguzAshycUaRJu6W', 'nana'),
+    (37, 'Lala', 'lalali@gmail.com', '$2y$10$1z4iu0JlL7uE44Z0IxYgm.vxGrJDTUG3vJm5/UTXPYU4blKgFEKw6', 'Lalisa')
+    ON DUPLICATE KEY UPDATE id=id;
+    
+    COMMIT;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+            - name: MYSQL_DATABASE
+              value: attendance_system
+            - name: MYSQL_USER
+              value: annisa
+            - name: MYSQL_PASSWORD
+              value: "12345"
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: "/var/lib/mysql"
+            - name: mysql-init-script
+              mountPath: "/docker-entrypoint-initdb.d"
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+        - name: mysql-init-script
+          configMap:
+            name: mysql-init-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+  type: ClusterIP
